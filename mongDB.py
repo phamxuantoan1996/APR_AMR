@@ -29,7 +29,7 @@ class MongoDataBase:
 
     def MongoDB_detele(self,collection_name:str,data:dict) -> int:
         try:
-            res = self.collectionsDB[collection_name].delete_one(data)
+            res = self.collectionsDB[collection_name].delete_many(data)
             return res.deleted_count
         except Exception as e:
             print("MongoDB error : " + str(e))
