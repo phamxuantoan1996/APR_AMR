@@ -82,7 +82,8 @@ def task_chain_excution_func():
         apr_task_chain = status['task_chain']
         apr_task_chain_status = status['task_chain_status']
         if len(apr_task_chain) > 0 and apr_task_chain_status == 0:
-            db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={'task_chain_status':2})
+            task_index = 0
+            db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={'task_chain_status':2,"task_index":0})
             for task in apr_task_chain:
                 if task['task_name'] == 'navigation_block':
                     print('APR move to ',task['target_point'])
@@ -94,16 +95,20 @@ def task_chain_excution_func():
                 if task['task_name'] == 'navigation_non_block':
                     print('APR move to ',task['target_point'])
                     Robot.navigation({"id":task['target_point']})
-                    time.sleep(2)
+                    time.sleep(10)
 
                 if task['task_name'] == 'pick':
                     print('APR pick magazine.')
-                    time.sleep(2)
+                    time.sleep(10)
 
                 if task['task_name'] == 'put':
                     print('APR put magazine.')
-                    time.sleep(2)
+                    time.sleep(10)
+                task_index = task_index + 1
+                db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={"task_index":task_index})
             
+            status = db.MongoDB_find(collection_name="APR_Status",query={"_id":1})[0]
+            db.MongoDB_detele(collection_name="APR_Missions",data={"_id":status["mission_recv"]["_id"]})
             db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={'task_chain_status':10})
         print('------------------------------')
         time.sleep(2)
@@ -113,7 +118,7 @@ def task_chain_excution_func():
 
 if __name__ == '__main__':
     
-    db = MongoDataBase(database_name="APR_DB",collections_name=["APR_Status","Call_Machine"])
+    db = MongoDataBase(database_name="APR_DB",collections_name=["APR_Status","Call_Machine","APR_Missions"])
     if db.MongoDB_Init():
         print('MongoDB init success')
     else:
@@ -130,4 +135,4 @@ if __name__ == '__main__':
     task_chain_excution.start()
 
 
-    app.run(host='0.0.0.0',port=8001,debug=False)
+    app.run(host='0.0.0.0',port=8000,debug=False)
