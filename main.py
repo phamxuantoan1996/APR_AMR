@@ -8,6 +8,8 @@ import time
 from mongDB import MongoDataBase
 from control import ESA_API
 
+import datetime
+
 app = Flask(__name__)
 CORS(app=app)
 
@@ -66,6 +68,18 @@ def src_init() -> bool:
                 break
     return check_init
     
+def writeLogDB(msg:str):
+    date_str = datetime.datetime.now().strftime("%d/%m/%Y")
+    time_str = datetime.datetime.now().strftime("%H:%M:%S")
+
+    content = {
+        "date" : date_str,
+        "time" : time_str,
+        "message" : msg
+    }
+    db.MongoDB_insert(collection_name="Logfile",data=content)
+
+
 @app.route('/status',methods = ['GET'])
 def status():
     return jsonify(Robot.data_Status),200
@@ -79,6 +93,7 @@ def task_src_status_poll_func():
 def task_chain_excution_func():
     while True:
         status = db.MongoDB_find(collection_name="APR_Status",query={"_id":1})[0]
+        mode = status["work_mode"]
         apr_task_chain = status['task_chain']
         apr_task_chain_status = status['task_chain_status']
         if len(apr_task_chain) > 0 and apr_task_chain_status == 0:
@@ -87,6 +102,7 @@ def task_chain_excution_func():
             for task in apr_task_chain:
                 if task['task_name'] == 'navigation_block':
                     print('APR move to ',task['target_point'])
+                    writeLogDB("AMR di chuyen den diem : " + task["target_point"])
                     Robot.navigation({"id":task['target_point']})
                     while True:
                         if Robot.check_target(Robot.data_Status,target=task['target_point']):
@@ -94,22 +110,28 @@ def task_chain_excution_func():
                 
                 if task['task_name'] == 'navigation_non_block':
                     print('APR move to ',task['target_point'])
+                    writeLogDB("AMR di chuyen den diem : " + task["target_point"])
                     Robot.navigation({"id":task['target_point']})
                     time.sleep(10)
 
                 if task['task_name'] == 'pick':
-                    print('APR pick magazine.')
+                    print("AMR pick magazine")
+                    writeLogDB("AMR lay magazine : " + "lift = " + str(task["level_lift"]))
                     time.sleep(10)
+                    writeLogDB("AMR lay xong magazine")
 
                 if task['task_name'] == 'put':
                     print('APR put magazine.')
+                    writeLogDB("AMR tra magazine : " + "lift = " + str(task["level_lift"]))
                     time.sleep(10)
+                    writeLogDB("AMR tra xong magazine")
                 task_index = task_index + 1
                 db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={"task_index":task_index})
             
             status = db.MongoDB_find(collection_name="APR_Status",query={"_id":1})[0]
-            db.MongoDB_detele(collection_name="APR_Missions",data={"_id":status["mission_recv"]["_id"]})
-            db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={'task_chain_status':10})
+            if mode == "Auto":
+                db.MongoDB_detele(collection_name="APR_Missions",data={"_id":status["mission_recv"]["_id"]})
+            db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={'task_chain_status':10,'mission_recv':{},"task_index":0,"task_chain":[]})
         print('------------------------------')
         time.sleep(2)
 
@@ -118,7 +140,7 @@ def task_chain_excution_func():
 
 if __name__ == '__main__':
     
-    db = MongoDataBase(database_name="APR_DB",collections_name=["APR_Status","Call_Machine","APR_Missions"])
+    db = MongoDataBase(database_name="APR_DB",collections_name=["APR_Status","Call_Machine","APR_Missions","Logfile"])
     if db.MongoDB_Init():
         print('MongoDB init success')
     else:
