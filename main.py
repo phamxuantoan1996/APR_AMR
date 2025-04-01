@@ -10,6 +10,8 @@ from control import ESA_API
 
 import datetime
 
+apr_status = {}
+
 app = Flask(__name__)
 CORS(app=app)
 
@@ -85,55 +87,70 @@ def status():
     return jsonify(Robot.data_Status),200
 
 def task_src_status_poll_func():
+    global apr_status
     while True:
         Robot.status(Robot.keys)
         db.MongoDB_update(collection_name="APR_Status",query={"_id":1},data={"src_status":Robot.data_Status})
-        time.sleep(0.5)
+        time.sleep(0.2)
+        apr_status = db.MongoDB_find(collection_name="APR_Status",query={"_id":1})[0]
 
 def task_chain_excution_func():
     while True:
-        status = db.MongoDB_find(collection_name="APR_Status",query={"_id":1})[0]
-        mode = status["work_mode"]
-        apr_task_chain = status['task_chain']
-        apr_task_chain_status = status['task_chain_status']
-        if len(apr_task_chain) > 0 and apr_task_chain_status == 0:
-            task_index = 0
-            db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={'task_chain_status':2,"task_index":0})
-            for task in apr_task_chain:
-                if task['task_name'] == 'navigation_block':
-                    print('APR move to ',task['target_point'])
-                    writeLogDB("AMR di chuyen den diem : " + task["target_point"])
-                    Robot.navigation({"id":task['target_point']})
-                    while True:
-                        if Robot.check_target(Robot.data_Status,target=task['target_point']):
-                            break
+        try:
+        # status = db.MongoDB_find(collection_name="APR_Status",query={"_id":1})[0]
+            mode = apr_status["work_mode"]
+            apr_task_chain = apr_status['task_chain']
+            apr_task_chain_status = apr_status['task_chain_status']
+            if len(apr_task_chain) > 0 and apr_task_chain_status == 0:
+                task_index = 0
+                db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={'task_chain_status':2,"task_index":0})
+                for task in apr_task_chain:
+                    if task['task_name'] == 'navigation_block':
+                        print('APR move to ',task['target_point'])
+                        writeLogDB("AMR di chuyen den diem : " + task["target_point"])
+                        Robot.navigation({"id":task['target_point']})
+                        while True:
+                            if Robot.check_target(Robot.data_Status,target=task['target_point']):
+                                break
+                            if apr_status["signal_cancel"] == 1:
+                                break   
+                    
+                    if task['task_name'] == 'navigation_non_block':
+                        print('APR move to ',task['target_point'])
+                        writeLogDB("AMR di chuyen den diem : " + task["target_point"])
+                        Robot.navigation({"id":task['target_point']})
+                        time.sleep(10)
+
+                    if task['task_name'] == 'pick':
+                        print("AMR pick magazine")
+                        writeLogDB("AMR lay magazine : " + "lift = " + str(task["level_lift"]))
+                        time.sleep(10)
+                        writeLogDB("AMR lay xong magazine")
+
+                    if task['task_name'] == 'put':
+                        print('APR put magazine.')
+                        writeLogDB("AMR tra magazine : " + "lift = " + str(task["level_lift"]))
+                        time.sleep(10)
+                        writeLogDB("AMR tra xong magazine")
+                    task_index = task_index + 1
+                    db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={"task_index":task_index})
                 
-                if task['task_name'] == 'navigation_non_block':
-                    print('APR move to ',task['target_point'])
-                    writeLogDB("AMR di chuyen den diem : " + task["target_point"])
-                    Robot.navigation({"id":task['target_point']})
-                    time.sleep(10)
-
-                if task['task_name'] == 'pick':
-                    print("AMR pick magazine")
-                    writeLogDB("AMR lay magazine : " + "lift = " + str(task["level_lift"]))
-                    time.sleep(10)
-                    writeLogDB("AMR lay xong magazine")
-
-                if task['task_name'] == 'put':
-                    print('APR put magazine.')
-                    writeLogDB("AMR tra magazine : " + "lift = " + str(task["level_lift"]))
-                    time.sleep(10)
-                    writeLogDB("AMR tra xong magazine")
-                task_index = task_index + 1
-                db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={"task_index":task_index})
-            
-            status = db.MongoDB_find(collection_name="APR_Status",query={"_id":1})[0]
-            if mode == "Auto":
-                db.MongoDB_detele(collection_name="APR_Missions",data={"_id":status["mission_recv"]["_id"]})
-            db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={'task_chain_status':10,'mission_recv':{},"task_index":0,"task_chain":[]})
-        print('------------------------------')
-        time.sleep(2)
+                # status = db.MongoDB_find(collection_name="APR_Status",query={"_id":1})[0]
+                if apr_status["signal_cancel"] == 0:
+                    if mode == "Auto":
+                        db.MongoDB_detele(collection_name="APR_Missions",data={"_id":apr_status["mission_recv"]["_id"]})
+                    db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={'task_chain_status':10,'mission_recv':{},"task_index":0,"task_chain":[]})
+                else:
+                    if mode == "Auto":
+                        db.MongoDB_detele(collection_name="APR_Missions",data={"_id":apr_status["mission_recv"]["_id"]})
+                    db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={'task_chain_status':20,'mission_recv':{},"task_index":0,"task_chain":[],"work_mode":"Manual"})
+                Robot.cancel_navigation()
+                db.MongoDB_update(collection_name="APR_Status",query={'_id':1},data={"signal_cancel":0})
+            print('------------------------------')
+            time.sleep(2)
+        except Exception as e:
+            print('task_execution_task fail : ',str(e))
+            time.sleep(4)
 
 
 
