@@ -128,6 +128,7 @@ class Board_Control():
         while True:
             # self.__input_regs = self.read_input_regs(address=self.__start_input_reg,count=self.__num_input_reg)
             print('input regs : ',self.__input_regs)
+            print('hold : ',self.__hold_regs)
             if self.write_hold_regs(address=self.__start_hold_reg,value=self.__hold_regs) and (len(self.__input_regs) > 0):
                 # self._modbus_error = False
                 pass

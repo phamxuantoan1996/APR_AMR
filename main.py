@@ -8,6 +8,8 @@ import time
 from mongDB import MongoDataBase
 from control import ESA_API
 
+from amr_control_board import AMR_Control_Board
+
 import datetime
 
 apr_status = {}
@@ -162,6 +164,8 @@ if __name__ == '__main__':
         print('MongoDB init success')
     else:
         print('MongoDB init fail')
+    
+    control_board = AMR_Control_Board()
 
     Robot = ESA_API(host="192.168.192.5")
     src_init()

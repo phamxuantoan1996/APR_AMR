@@ -7,10 +7,12 @@ class APR_Led_Color:
     Yellow = 10
     Green = 2
 
-class APR_Convoyer:
+class APR_Transfer:
     Stop = 0
-    CW = 1
-    CCW = 2
+    Pick_From_Left = 1
+    Put_To_Left = 2
+    Pick_From_Right = 3
+    Put_To_Right = 4
 
 class APR_Stopper:
     Non = 0
@@ -20,10 +22,9 @@ class APR_Stopper:
 class APR_Hold_Addr:
     Led = 0
     Lift = 1
-    Convoyer = 2
-    Stopper = 3
+    Transfer = 2
 
-class AGF_Control:
+class AMR_Control_Board:
 
     def set_hold_reg(self,val:list) -> bool:
         url_post = "http://127.0.0.1:8000/hold_regs"
@@ -60,17 +61,13 @@ class AGF_Control:
         self.set_hold_reg(val=values)
         print('--set_lift--')
 
-    def SetConvoyer(self,dir:APR_Convoyer):
-        values = [{"address" : APR_Hold_Addr.Convoyer,"value" : dir}] 
+    def SetTransfer(self,dir:APR_Transfer):
+        values = [{"address" : APR_Hold_Addr.Transfer,"value" : dir}] 
         self.set_hold_reg(val=values)
         print('--set_convoyer--')
 
-    def SetStopper(self,status:APR_Stopper):
-        values = [{"address" : APR_Hold_Addr.Stopper,"value" : status}] 
-        self.set_hold_reg(val=values)
-        print('--set_stopper--')
+# if __name__ == '__main__':
 
-if __name__ == '__main__':
-
-    apr_board_control = AGF_Control()
-    apr_board_control.SetLed(color=APR_Led_Color.Yellow)
+#     apr_board_control = AGF_Control()
+#     # apr_board_control.SetLed(color=APR_Led_Color.Red)
+#     apr_board_control.SetTransfer(APR_Transfer.Stop)
