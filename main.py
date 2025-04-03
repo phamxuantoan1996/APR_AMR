@@ -8,7 +8,7 @@ import time
 from mongDB import MongoDataBase
 from control import ESA_API
 
-from amr_control_board import AMR_Control_Board
+from amr_control_board import AMR_Control_Board,APR_Transfer
 
 import datetime
 
@@ -99,7 +99,6 @@ def task_src_status_poll_func():
 def task_chain_excution_func():
     while True:
         try:
-        # status = db.MongoDB_find(collection_name="APR_Status",query={"_id":1})[0]
             mode = apr_status["work_mode"]
             apr_task_chain = apr_status['task_chain']
             apr_task_chain_status = apr_status['task_chain_status']
@@ -126,18 +125,79 @@ def task_chain_excution_func():
                     if task['task_name'] == 'pick':
                         print("AMR pick magazine")
                         writeLogDB("AMR lay magazine : " + "lift = " + str(task["level_lift"]))
-                        time.sleep(10)
+                        # control lift
+                        while not control_board.SetLift(task["level_lift"]):
+                            time.sleep(1)
+                        while True:
+                            inputs = control_board.get_input_reg()
+                            if len(inputs) > 0:
+                                if inputs[1] == task["level_lift"]:
+                                    break
+                            time.sleep(1)
+                        time.sleep(2)
+                        # control convoyer
+                        while not control_board.SetTransfer(APR_Transfer.Pick_From_Left):
+                            time.sleep(1)
+                        while True:
+                            inputs = control_board.get_input_reg()
+                            if len(inputs) > 0:
+                                if inputs[2] == APR_Transfer.Pick_From_Left:
+                                    break
+                            time.sleep(1)
+                        time.sleep(2)
+                        # control lift
+                        # control lift
+                        while not control_board.SetLift(100):
+                            time.sleep(1)
+                        while True:
+                            inputs = control_board.get_input_reg()
+                            if len(inputs) > 0:
+                                if inputs[1] == 100:
+                                    break
+                            time.sleep(1)
+                        time.sleep(2)
+                        # 
                         writeLogDB("AMR lay xong magazine")
-
                     if task['task_name'] == 'put':
                         print('APR put magazine.')
                         writeLogDB("AMR tra magazine : " + "lift = " + str(task["level_lift"]))
+                        # control lift
+                        while not control_board.SetLift(task["level_lift"]):
+                            time.sleep(1)
+                        while True:
+                            inputs = control_board.get_input_reg()
+                            if len(inputs) > 0:
+                                if inputs[1] == task["level_lift"]:
+                                    break
+                            time.sleep(1)
+                        time.sleep(2)
+                        # control convoyer
+                        while not control_board.SetTransfer(APR_Transfer.Put_To_Left):
+                            time.sleep(1)
                         time.sleep(10)
+                        while not control_board.SetTransfer(APR_Transfer.Stop):
+                            time.sleep(1)
+                        while True:
+                            inputs = control_board.get_input_reg()
+                            if len(inputs) > 0:
+                                if inputs[2] == APR_Transfer.Stop:
+                                    break
+                            time.sleep(1)
+                        time.sleep(2)
+                        # control lift
+                        while not control_board.SetLift(100):
+                            time.sleep(1)
+                        while True:
+                            inputs = control_board.get_input_reg()
+                            if len(inputs) > 0:
+                                if inputs[1] == 100:
+                                    break
+                            time.sleep(1)
+                        time.sleep(2)
                         writeLogDB("AMR tra xong magazine")
                     task_index = task_index + 1
                     db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={"task_index":task_index})
                 
-                # status = db.MongoDB_find(collection_name="APR_Status",query={"_id":1})[0]
                 if apr_status["signal_cancel"] == 0:
                     if mode == "Auto":
                         db.MongoDB_detele(collection_name="APR_Missions",data={"_id":apr_status["mission_recv"]["_id"]})
@@ -154,9 +214,6 @@ def task_chain_excution_func():
             print('task_execution_task fail : ',str(e))
             time.sleep(4)
 
-
-
-
 if __name__ == '__main__':
     
     db = MongoDataBase(database_name="APR_DB",collections_name=["APR_Status","Call_Machine","APR_Missions","Logfile"])
@@ -164,18 +221,24 @@ if __name__ == '__main__':
         print('MongoDB init success')
     else:
         print('MongoDB init fail')
-    
-    control_board = AMR_Control_Board()
 
     Robot = ESA_API(host="192.168.192.5")
     src_init()
 
+    control_board = AMR_Control_Board()
+    while not control_board.SetLift(100):
+        time.sleep(1)
+    while True:
+        inputs = control_board.get_input_reg()
+        if len(inputs) > 0:
+            if inputs[1] == 100:
+                break
+        time.sleep(1)
+
     task_src_status_poll = Thread(target=task_src_status_poll_func,args=())
     task_src_status_poll.start()
     
-
     task_chain_excution = Thread(target=task_chain_excution_func,args=())
     task_chain_excution.start()
 
-
-    app.run(host='0.0.0.0',port=8000,debug=False)
+    app.run(host='0.0.0.0',port=8001,debug=False)

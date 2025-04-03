@@ -116,7 +116,7 @@ class Board_Control():
             print(str(e))
             return []
     
-    def write_hold_regs(self,address:int,value:list) -> None:
+    def write_hold_regs(self,address:int,value:list) -> bool:
         try:
             self.client.write_registers(registeraddress=address,values=value)
             return True
@@ -135,6 +135,7 @@ class Board_Control():
             else:
                 # self._modbus_error = True
                 pass
+            self.__input_regs = self.read_input_regs(address=0,count=10)
             time.sleep(self.__time_poll)
 
     def Board_Control_Start(self):

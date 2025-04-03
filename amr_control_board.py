@@ -56,18 +56,19 @@ class AMR_Control_Board:
         self.set_hold_reg(val=values)
         print('--set_led--')
 
-    def SetLift(self,lift:int):
+    def SetLift(self,lift:int) -> bool:
         values = [{"address" : APR_Hold_Addr.Lift,"value" : lift}] 
-        self.set_hold_reg(val=values)
         print('--set_lift--')
+        return self.set_hold_reg(val=values)
 
-    def SetTransfer(self,dir:APR_Transfer):
+    def SetTransfer(self,dir:APR_Transfer) -> bool:
         values = [{"address" : APR_Hold_Addr.Transfer,"value" : dir}] 
-        self.set_hold_reg(val=values)
         print('--set_convoyer--')
+        return self.set_hold_reg(val=values)
 
-# if __name__ == '__main__':
+if __name__ == '__main__':
 
-#     apr_board_control = AGF_Control()
-#     # apr_board_control.SetLed(color=APR_Led_Color.Red)
-#     apr_board_control.SetTransfer(APR_Transfer.Stop)
+    apr_board_control = AMR_Control_Board()
+    # apr_board_control.SetLed(color=APR_Led_Color.Red)
+    # apr_board_control.SetTransfer(APR_Transfer.Stop)
+    apr_board_control.SetLift(400)
