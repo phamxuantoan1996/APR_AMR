@@ -71,4 +71,4 @@ if __name__ == '__main__':
     apr_board_control = AMR_Control_Board()
     # apr_board_control.SetLed(color=APR_Led_Color.Red)
     # apr_board_control.SetTransfer(APR_Transfer.Stop)
-    apr_board_control.SetLift(400)
+    apr_board_control.SetLift(100)
