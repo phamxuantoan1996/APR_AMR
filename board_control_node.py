@@ -110,7 +110,7 @@ class Board_Control():
 
     def read_input_regs(self,address:int,count:int) -> list:
         try:
-            value = self.client.read_registers(registeraddress=address,number_of_registers=count,functioncode=Modbus_Function_Code.ReadInputRegs)
+            value = self.client.read_registers(registeraddress=address,number_of_registers=20,functioncode=Modbus_Function_Code.ReadInputRegs)
             return value
         except Exception as e:
             print(str(e))
@@ -135,7 +135,7 @@ class Board_Control():
             else:
                 # self._modbus_error = True
                 pass
-            self.__input_regs = self.read_input_regs(address=0,count=10)
+            self.__input_regs = self.read_input_regs(address=0,count=self.__num_input_reg)
             time.sleep(self.__time_poll)
 
     def Board_Control_Start(self):
@@ -144,7 +144,7 @@ class Board_Control():
         app.run(host=self.__api_addr,port=self.__api_port,debug=False)
 
 if __name__ == '__main__':
-    board = Board_Control(api_addr='0.0.0.0',api_port=8000,modbus_port="/dev/ttyUSB0",modbus_baudrate=115200,num_hold_reg=10,start_hold_reg=0,num_input_reg=10,start_input_reg=0,slave_id=1,time_poll=0.25,timeout_modbus=10)
+    board = Board_Control(api_addr='0.0.0.0',api_port=8000,modbus_port="/dev/ttyUSB0",modbus_baudrate=115200,num_hold_reg=10,start_hold_reg=0,num_input_reg=20,start_input_reg=0,slave_id=1,time_poll=0.25,timeout_modbus=10)
     if board.ConnectToBoard():
         print('connect to board control success')
     else:

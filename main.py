@@ -73,15 +73,38 @@ def src_init() -> bool:
     return check_init
     
 def writeLogDB(msg:str):
-    date_str = datetime.datetime.now().strftime("%d/%m/%Y")
+    date_str = datetime.datetime.now().strftime("%Y/%m/%d")
     time_str = datetime.datetime.now().strftime("%H:%M:%S")
-
     content = {
         "date" : date_str,
         "time" : time_str,
         "message" : msg
     }
     db.MongoDB_insert(collection_name="Logfile",data=content)
+
+def writeMissionDB(line:int,type:int,time_start_str:str):
+    date_str = datetime.datetime.now().strftime("%Y/%m/%d")
+    time_end_str = datetime.datetime.now().strftime("%H:%M:%S")
+    content = {
+        "date" : date_str,
+        "time_start" : time_start_str,
+        "time_end" : time_end_str,
+        "line" : line,
+        "type" : type
+    }
+    
+    db.MongoDB_insert(collection_name="Logfile",data=content)
+
+@app.route('/navigation',methods = ['POST'])
+def apr_navigation():
+    try:
+        content = request.json
+        if 'id' in content.keys():
+            Robot.navigation({"id":content['id']})
+            return jsonify({"result":True}),201
+        return jsonify({"result":False}),200
+    except Exception as e:
+        return jsonify({"error":str(e)}),500
 
 # {"lift":500}
 @app.route('/lift',methods = ['POST'])
@@ -96,27 +119,39 @@ def lift():
     except Exception as e:
         return jsonify({"result":False,"error":str(e)}),500
     
-# {"convoyer":1}
-@app.route('/convoyer',methods = ['POST'])
+# {"convoyer":"stop","cw","ccw"}
+@app.route('/conveyor',methods = ['POST'])
 def convoyer():
     try:
         content = request.json
-        val = int(content["convoyer"])
-        if val <= 4 and val >= 0:
-            if val == 0:
-                control_board.SetTransfer(APR_Transfer.Stop)
-            elif val == 1:
-                control_board.SetTransfer(APR_Transfer.Pick_From_Left)
-            elif val == 2:
-                control_board.SetTransfer(APR_Transfer.Put_To_Left)
-            elif val == 3:
-                control_board.SetTransfer(APR_Transfer.Pick_From_Right)
-            elif val == 4:
-                control_board.SetTransfer(APR_Transfer.Put_To_Right)
+        if content["conveyor"] == 'cw':
+            control_board.Conv_Manual_CW()
+            return jsonify({"result":True}),201
+        elif content["conveyor"] == 'ccw':
+            control_board.Conv_Manual_CCW()
+            return jsonify({"result":True}),201
+        elif content["conveyor"] == 'stop':
+            control_board.Conv_Manual_Stop()
             return jsonify({"result":True}),201
         return jsonify({"result":False}),400
     except Exception as e:
         return jsonify({"result":False,"error":str(e)}),500
+
+# {"stopper":"up","down"}
+@app.route('/stopper',methods = ['POST'])
+def stopper():
+    try:
+        content = request.json
+        if content["stopper"] == "up":
+            control_board.Stopper_Manual_Up()
+            return jsonify({"result":True}),201
+        elif content["stopper"] == "down":
+            control_board.Stopper_Manual_Down()
+            return jsonify({"result":True}),201
+        return jsonify({"result":False}),400
+    except Exception as e:
+        return jsonify({"result":False,"error":str(e)}),500
+
 
 def task_src_status_poll_func():
     global apr_status
@@ -133,8 +168,11 @@ def task_chain_excution_func():
             apr_task_chain = apr_status['task_chain']
             apr_task_chain_status = apr_status['task_chain_status']
             if len(apr_task_chain) > 0 and apr_task_chain_status == 0:
+                time_start_str = datetime.datetime.now().strftime("%H:%M:%S")
+                mission_success = True
                 task_index = 0
                 db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={'task_chain_status':2,"task_index":0})
+                is_magazine = True
                 for task in apr_task_chain:
                     if task['task_name'] == 'navigation_block':
                         print('APR move to ',task['target_point'])
@@ -142,24 +180,23 @@ def task_chain_excution_func():
                         Robot.navigation({"id":task['target_point']})
                         while True:
                             if Robot.check_target(Robot.data_Status,target=task['target_point']):
+                                task_index = task_index + 1
                                 break 
                             print("signal cancel : ",apr_status["signal_cancel"])
                             if apr_status["signal_cancel"] == 1:
-                                    print("exit1")
+                                    mission_success = False
                                     break
                             time.sleep(1)  
                     if apr_status["signal_cancel"] == 1:
-                        print("exit1")
                         break
                     if task['task_name'] == 'navigation_non_block':
                         print('APR move to ',task['target_point'])
                         writeLogDB("AMR di chuyen den diem : " + task["target_point"])
                         Robot.navigation({"id":task['target_point']})
                         time.sleep(10)
-                    # if Robot.data_Status["current_station"]==task['target_point']:
-                    if True:
-                        print("start work")
-                        if task['task_name'] == 'pick':
+                    if task['task_name'] == 'pick':
+                        call_machine = db.MongoDB_find(collection_name="Call_Machine",query={"_id":task["line"]})[0]
+                        if call_machine["floor2"] == 1 and not is_magazine:
                             print("AMR pick magazine")
                             writeLogDB("AMR lay magazine : " + "lift = " + str(task["level_lift"]))
                             # control lift
@@ -203,7 +240,19 @@ def task_chain_excution_func():
                             time.sleep(2)
                             # 
                             writeLogDB("AMR lay xong magazine")
-                        if task['task_name'] == 'put':
+                        else:
+                            mission_success = False
+                        task_index = task_index + 1
+                    if task['task_name'] == 'put':
+                        call_machine = db.MongoDB_find(collection_name="Call_Machine",query={"_id":task["line"]})[0]
+                        # send cmd to loader rotate
+                        id_line = task["line"]
+                        if id_line in [1,2,3,4,5,6,7]:
+                            if db.MongoDB_update(collection_name="Call_Machine",query={"_id":task["line"]},data={"request_transfer":[0,0,1,0]}):
+                                print("convoyer rotate ok")
+                        time.sleep(8)
+                        call_machine = db.MongoDB_find(collection_name="Call_Machine",query={"_id":task["line"]})[0]
+                        if call_machine["floor1"] == 1:
                             print('APR put magazine.')
                             writeLogDB("AMR tra magazine : " + "lift = " + str(task["level_lift"]))
                             # control lift
@@ -216,14 +265,9 @@ def task_chain_excution_func():
                                         break
                                 time.sleep(1)
                             time.sleep(1)
-                            # send cmd to loader rotate
-                            id_line = task["line"]
-                            if id_line in [1,2,3,4,5,6,7]:
-                                db.MongoDB_update(collection_name="Call_Machine",query={"_id":task["line"]},data={"request_transfer":[0,0,1,0]})
                             # control convoyer
                             while not control_board.SetTransfer(APR_Transfer.Put_To_Left):
                                 time.sleep(1)
-                            
                             if id_line in [1,2,3,4,5,6,7]:
                                 while True:
                                     call_machine = db.MongoDB_find(collection_name="Call_Machine",query={"_id":id_line})[0]
@@ -254,18 +298,34 @@ def task_chain_excution_func():
                                         break
                                 time.sleep(1)
                             time.sleep(2)
+                            is_magazine = False
                             writeLogDB("AMR tra xong magazine")
+                        else:
+                            # send cmd stop loader
+                            id_line = task["line"]
+                            if id_line in [1,2,3,4,5,6,7]:
+                                if db.MongoDB_update(collection_name="Call_Machine",query={"_id":task["line"]},data={"request_transfer":[0,0,0,0]}):
+                                    print("stop convoyer ok")
+                            mission_success = False
                         task_index = task_index + 1
-                        db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={"task_index":task_index})
-                if apr_status["signal_cancel"] == 0:
-                    if mode == "Auto":
-                        db.MongoDB_detele(collection_name="APR_Missions",data={"_id":apr_status["mission_recv"]["_id"]})
-                    db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={'task_chain_status':10,'mission_recv':{},"task_index":None,"task_chain":[]})
+                    db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={"task_index":task_index})
+                if mission_success:
+                    writeMissionDB(line=apr_task_chain[0]["line"],type=1,time_start_str=time_start_str)
                 else:
+                    writeMissionDB(line=apr_task_chain[0]["line"],type=0,time_start_str=time_start_str)
+                if apr_status["signal_cancel"] == 1:
+                    # writeMissionDB(line=apr_task_chain[0]["line"],type=0)
                     if mode == "Auto":
                         db.MongoDB_detele(collection_name="APR_Missions",data={"_id":apr_status["mission_recv"]["_id"]})
                     db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={'task_chain_status':20,'mission_recv':{},"task_index":0,"task_chain":[],"work_mode":"Manual"})
                     Robot.cancel_navigation()
+                else:
+                    # writeMissionDB(line=apr_task_chain[0]["line"],type=1)
+                    if mode == "Auto":
+                        db.MongoDB_detele(collection_name="APR_Missions",data={"_id":apr_status["mission_recv"]["_id"]})
+                    db.MongoDB_update(collection_name='APR_Status',query={'_id':1},data={'task_chain_status':10,'mission_recv':{},"task_index":None,"task_chain":[]})
+
+                    
                 db.MongoDB_update(collection_name="APR_Status",query={'_id':1},data={"signal_cancel":0})
             print('------------------------------')
             time.sleep(2)
@@ -295,12 +355,12 @@ def task_control_led_sound_func():
                 if led_cur != 2:
                     led_cur = 2
                     control_board.SetLed(2)
+            sensor = control_board.get_input_reg()[10:20]
+            db.MongoDB_update(collection_name="APR_Status",query={"_id":1},data={"sensors":sensor})
+            
         except Exception as e:
             print("task control led : ",str(e))
-        
         time.sleep(1)
-
-            
         # control_sound
 
 
@@ -313,7 +373,7 @@ if __name__ == '__main__':
         print('MongoDB init success')
     else:
         print('MongoDB init fail')
-    db.MongoDB_update(collection_name="APR_Status",query={"_id":1},data={"task_chain_status":0})
+    db.MongoDB_update(collection_name="APR_Status",query={"_id":1},data={"task_chain_status":0,"task_chain":[],"mission_recv":{},"task_index":None,"signal_cancel":0})
     Robot = ESA_API(host="192.168.192.5")
     src_init()
 
@@ -326,6 +386,8 @@ if __name__ == '__main__':
             if inputs[1] == 100:
                 break
         time.sleep(1)
+    
+    writeLogDB("AMR Initial Successed")
 
     task_src_status_poll = Thread(target=task_src_status_poll_func,args=())
     task_src_status_poll.start()

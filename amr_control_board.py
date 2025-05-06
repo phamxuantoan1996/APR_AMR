@@ -65,10 +65,42 @@ class AMR_Control_Board:
         values = [{"address" : APR_Hold_Addr.Transfer,"value" : dir}] 
         print('--set_convoyer--')
         return self.set_hold_reg(val=values)
+    
+    def Conv_Manual_CW(self) -> bool:
+        values = [{"address" : APR_Hold_Addr.Transfer,"value" : 6}] 
+        print('--set_convoyer--')
+        return self.set_hold_reg(val=values)
+    def Conv_Manual_CCW(self) -> bool:
+        values = [{"address" : APR_Hold_Addr.Transfer,"value" : 7}] 
+        print('--set_convoyer--')
+        return self.set_hold_reg(val=values)
+    def Conv_Manual_Stop(self) -> bool:
+        values = [{"address" : APR_Hold_Addr.Transfer,"value" : 8}] 
+        print('--set_convoyer--')
+        return self.set_hold_reg(val=values)
+    def Stopper_Manual_Up(self) -> bool:
+        values = [{"address" : APR_Hold_Addr.Transfer,"value" : 9}] 
+        print('--set_convoyer--')
+        return self.set_hold_reg(val=values)
+    def Stopper_Manual_Down(self) -> bool:
+        values = [{"address" : APR_Hold_Addr.Transfer,"value" : 10}] 
+        print('--set_convoyer--')
+        return self.set_hold_reg(val=values)
+    
+
 
 if __name__ == '__main__':
 
     apr_board_control = AMR_Control_Board()
     # apr_board_control.SetLed(color=APR_Led_Color.Red)
-    # apr_board_control.SetTransfer(APR_Transfer.Stop)
-    apr_board_control.SetLift(100)
+    while True:
+        apr_board_control.SetTransfer(APR_Transfer.Put_To_Left)
+        time.sleep(8)
+        apr_board_control.SetTransfer(APR_Transfer.Stop)
+        time.sleep(1)
+        apr_board_control.SetTransfer(APR_Transfer.Pick_From_Left)
+        time.sleep(8)
+        apr_board_control.SetTransfer(APR_Transfer.Stop)
+        time.sleep(1)
+    # apr_board_control.SetLift(100)
+    # apr_board_control.Conv_Manual_CCW()

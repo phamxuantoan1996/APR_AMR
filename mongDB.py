@@ -1,4 +1,5 @@
 import pymongo
+import datetime
 class MongoDataBase:
     def __init__(self,database_name:str,collections_name:list) -> None:
         self.clientMongo = pymongo.MongoClient('mongodb://localhost:27017/')
@@ -50,9 +51,25 @@ class MongoDataBase:
         except Exception as e:
             print("MongoDB error : " + str(e))
             return False
+        
+# def writeLogDB(msg:str):
+#     date_str = datetime.datetime.now().strftime("%d/%m/%Y")
+#     time_str = datetime.datetime.now().strftime("%H:%M:%S")
 
-if __name__ == '__main__':
-    apr_db = MongoDataBase(database_name="APR_DB",collections_name=["Call_Signal_Request"])
-    apr_db.MongoDB_Init()
-    l = apr_db.MongoDB_find(collection_name="Call_Signal_Request",query={})
-    print(l[0])
+#     content = {
+#         "date" : date_str,
+#         "time" : time_str,
+#         "message" : msg
+#     }
+#     apr_db.MongoDB_insert(collection_name="Logfile",data=content)
+
+# def readLogDB(date:str) -> list:
+#     logs = apr_db.MongoDB_find(collection_name="Logfile",query={"date":date})
+#     for i in range(0,len(logs)):
+#         logs[i].pop("_id")
+#     return logs
+
+# if __name__ == '__main__':
+#     apr_db = MongoDataBase(database_name="APR_DB",collections_name=["Logfile"])
+#     apr_db.MongoDB_Init()
+#     print(readLogDB(date="06/04/2025"))
